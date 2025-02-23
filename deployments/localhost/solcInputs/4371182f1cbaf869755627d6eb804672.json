@@ -1,0 +1,39 @@
+{
+  "language": "Solidity",
+  "sources": {
+    "@openzeppelin/contracts/security/ReentrancyGuard.sol": {
+      "content": "// SPDX-License-Identifier: MIT\n// OpenZeppelin Contracts (last updated v4.9.0) (security/ReentrancyGuard.sol)\n\npragma solidity ^0.8.0;\n\n/**\n * @dev Contract module that helps prevent reentrant calls to a function.\n *\n * Inheriting from `ReentrancyGuard` will make the {nonReentrant} modifier\n * available, which can be applied to functions to make sure there are no nested\n * (reentrant) calls to them.\n *\n * Note that because there is a single `nonReentrant` guard, functions marked as\n * `nonReentrant` may not call one another. This can be worked around by making\n * those functions `private`, and then adding `external` `nonReentrant` entry\n * points to them.\n *\n * TIP: If you would like to learn more about reentrancy and alternative ways\n * to protect against it, check out our blog post\n * https://blog.openzeppelin.com/reentrancy-after-istanbul/[Reentrancy After Istanbul].\n */\nabstract contract ReentrancyGuard {\n    // Booleans are more expensive than uint256 or any type that takes up a full\n    // word because each write operation emits an extra SLOAD to first read the\n    // slot's contents, replace the bits taken up by the boolean, and then write\n    // back. This is the compiler's defense against contract upgrades and\n    // pointer aliasing, and it cannot be disabled.\n\n    // The values being non-zero value makes deployment a bit more expensive,\n    // but in exchange the refund on every call to nonReentrant will be lower in\n    // amount. Since refunds are capped to a percentage of the total\n    // transaction's gas, it is best to keep them low in cases like this one, to\n    // increase the likelihood of the full refund coming into effect.\n    uint256 private constant _NOT_ENTERED = 1;\n    uint256 private constant _ENTERED = 2;\n\n    uint256 private _status;\n\n    constructor() {\n        _status = _NOT_ENTERED;\n    }\n\n    /**\n     * @dev Prevents a contract from calling itself, directly or indirectly.\n     * Calling a `nonReentrant` function from another `nonReentrant`\n     * function is not supported. It is possible to prevent this from happening\n     * by making the `nonReentrant` function external, and making it call a\n     * `private` function that does the actual work.\n     */\n    modifier nonReentrant() {\n        _nonReentrantBefore();\n        _;\n        _nonReentrantAfter();\n    }\n\n    function _nonReentrantBefore() private {\n        // On the first call to nonReentrant, _status will be _NOT_ENTERED\n        require(_status != _ENTERED, \"ReentrancyGuard: reentrant call\");\n\n        // Any calls to nonReentrant after this point will fail\n        _status = _ENTERED;\n    }\n\n    function _nonReentrantAfter() private {\n        // By storing the original value once again, a refund is triggered (see\n        // https://eips.ethereum.org/EIPS/eip-2200)\n        _status = _NOT_ENTERED;\n    }\n\n    /**\n     * @dev Returns true if the reentrancy guard is currently set to \"entered\", which indicates there is a\n     * `nonReentrant` function in the call stack.\n     */\n    function _reentrancyGuardEntered() internal view returns (bool) {\n        return _status == _ENTERED;\n    }\n}\n"
+    },
+    "contracts/SecureTransactionGuard.sol": {
+      "content": "// SPDX-License-Identifier: MIT\npragma solidity ^0.8.0;\n\nimport \"@openzeppelin/contracts/security/ReentrancyGuard.sol\";\n\ncontract SecureTransactionGuard is ReentrancyGuard {\n    \n    address public owner;\n    address public auditor;\n    mapping(address => bytes32) public pendingTxHash;\n    mapping(bytes32 => bool) public verifiedTxs;\n    \n    event TransactionHashStored(address indexed user, bytes32 txHash);\n    event TransactionVerified(address indexed user, bytes32 txHash);\n    event TransactionExecuted(address indexed user, bytes32 txHash);\n\n    modifier onlyOwner() {\n        require(msg.sender == owner, \"Not authorized\");\n        _;\n    }\n\n    modifier onlyAuditor() {\n        require(msg.sender == auditor, \"Not authorized\");\n        _;\n    }\n\n    constructor(address _auditor) {\n        require(_auditor != address(0), \"Invalid auditor address\");\n        owner = msg.sender;\n        auditor = _auditor;\n    }\n\n    function getOwner() public view returns (address) {\n        return owner;\n    }\n\n    // Step 1: Store the transaction hash before signing\n    function storeTransactionHash(bytes32 _txHash) external {\n        require(pendingTxHash[msg.sender] == bytes32(0), \"Pending transaction already exists\");\n        pendingTxHash[msg.sender] = _txHash;\n        emit TransactionHashStored(msg.sender, _txHash);\n    }\n\n    // Step 2: Auditor must verify the transaction before signing\n    function verifyTransaction(address user, bytes32 _txHash) external onlyAuditor {\n        require(pendingTxHash[user] != bytes32(0), \"No pending transaction\");\n        require(pendingTxHash[user] == _txHash, \"Transaction hash mismatch\");\n        verifiedTxs[_txHash] = true;\n        emit TransactionVerified(user, _txHash);\n    }\n\n    // Step 3: Execute only if verified\n    function executeTransaction(bytes32 _txHash) external nonReentrant {\n        require(verifiedTxs[_txHash], \"Transaction not verified\");\n        \n        // Here, the actual transaction execution logic should be implemented\n        \n        emit TransactionExecuted(msg.sender, _txHash);\n        \n        // Ensure successful execution before deleting pending data\n        if (verifiedTxs[_txHash]) {\n            delete pendingTxHash[msg.sender];\n            delete verifiedTxs[_txHash];\n        }\n    }\n}\n"
+    }
+  },
+  "settings": {
+    "evmVersion": "paris",
+    "optimizer": {
+      "enabled": false,
+      "runs": 200
+    },
+    "outputSelection": {
+      "*": {
+        "*": [
+          "abi",
+          "evm.bytecode",
+          "evm.deployedBytecode",
+          "evm.methodIdentifiers",
+          "metadata",
+          "devdoc",
+          "userdoc",
+          "storageLayout",
+          "evm.gasEstimates"
+        ],
+        "": [
+          "ast"
+        ]
+      }
+    },
+    "metadata": {
+      "useLiteralContent": true
+    }
+  }
+}
